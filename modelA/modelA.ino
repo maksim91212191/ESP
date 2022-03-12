@@ -2,34 +2,36 @@
 #include <Wire.h>
 #include <SPI.h>
 #include <Adafruit_Sensor.h>
-#include <Adafruit_BMP280.h>
+#include <Adafruit_BME280.h>
 
-#define BMP_SCK 13
-#define BMP_MISO 12
-#define BMP_MOSI 11
-#define BMP_CS 10
+#define BME_SCK 13
+#define BME_MISO 12
+#define BME_MOSI 11
+#define BME_CS 10
 
-#define ID "0"
+#define ID "1"
 #define TCA_ADDR 0x70
-#define BMP_ADDR 0x76
+#define BME_ADDR 0x76
 
-namespace bmp {
+namespace bme {
     int delayTime = 1000;
-    int bmpPin[3] = {3, 5, 7};
+    int bmePin[3] = {3, 5, 7};
 
-    struct BmpData {
+    struct BmeData {
         float temp      = 0;
         float pressure  = 0;
+        float humidity  = 0;
     };
-}    /* namespace bmp */
+}    /* namespace bme */
 
-Adafruit_BMP280 bmp280;
+Adafruit_BME280 bme280;
 
 namespace wifi {
-    const char* ssid     = "Fidget";
+    // const char* ssid     = "AndroidAP9D5C";
+    const char* ssid     =  "Fidget";
     const char* password =  "vfrcbv9121";
 
-    const char* host     = "192.168.1.89";
+    const char* host     = "192.168.1.76";
     uint16_t    port     = 1111;
 }    /* namespace wifi */
 
@@ -47,12 +49,12 @@ void setup() {
     Wire.begin();
 
     for (int i = 0; i < 3; ++i) {
-        int res = TcaSelect(bmp::bmpPin[i]);
+        int res = TcaSelect(bme::bmePin[i]);
         if (res == -1)
             Serial.println("TCA setup error");
-        res = (int)bmp280.begin();
+        res = (int)bme280.begin();
         if (res == 0)
-            Serial.println("BMP setup error");
+            Serial.println("BME setup error");
     }
 
     WiFi.begin(wifi::ssid, wifi::password);
@@ -67,34 +69,40 @@ void setup() {
 
 }
 
-String CreateMsg(const bmp::BmpData& bmpData) {
+String CreateMsg(const bme::BmeData& bmeData) {
     String msg = "";
-    msg += bmpData.temp;
+    msg += bmeData.temp;
     msg += '_';
-    msg += bmpData.pressure;
+    msg += bmeData.pressure;
+    msg += '_';
+    msg += bmeData.humidity;
     return msg;
 }
 
 void loop() {
-    bmp::BmpData bmpData;
+    bme::BmeData bmeData;
     for (int i = 0; i < 3; ++i) {
-        int res = TcaSelect(bmp::bmpPin[i]);
+        int res = TcaSelect(bme::bmePin[i]);
         if (res == -1)
             Serial.println("TCA setup error");
 
-        bmpData.temp += bmp280.readTemperature();
-        bmpData.pressure += (bmp280.readPressure() / 100.0F);
+        bmeData.temp     += bme280.readTemperature();
+        bmeData.pressure += (bme280.readPressure() / 100.0F);
+        bmeData.humidity += bme280.readHumidity();
     }
 
-    bmpData.temp     /= 3;
-    bmpData.pressure /= 3;
+    bmeData.temp     /= 3;
+    bmeData.pressure /= 3;
+    bmeData.humidity /= 3;
 
     Serial.print("Temperature = ");
-    Serial.println(bmpData.temp);
+    Serial.println(bmeData.temp);
     Serial.print("Pressure = ");
-    Serial.println(bmpData.pressure);
+    Serial.println(bmeData.pressure);
+    Serial.print("Humidity = ");
+    Serial.println(bmeData.humidity);
 
-    delay(bmp::delayTime);
+    delay(bme::delayTime);
 
     WiFiClient client;
     if (!client.connect(wifi::host, wifi::port)) {
@@ -103,7 +111,7 @@ void loop() {
     }
 
     client.print(ID);
-    String msg = CreateMsg(bmpData);
+    String msg = CreateMsg(bmeData);
     Serial.println(msg);
     client.print(msg);
 }
